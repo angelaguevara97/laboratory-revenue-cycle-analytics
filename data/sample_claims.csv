@@ -1,0 +1,9 @@
+claim_id,accession_id,submission_date,claim_type,charge_amount,allowed_amount,expected_reimbursement,payment_amount,claim_status,original_claim_id
+CLM0000001,ACC0000001,2026-10-16,Original,70.14,43.91,40.12,40.12,Paid,
+CLM0000002,ACC0000002,2026-10-18,Original,43.20,31.10,28.64,28.64,Paid,
+CLM0000003,ACC0000003,2026-10-21,Original,60.08,38.55,35.42,0.00,Denied,
+CLM0000004,ACC0000005,2026-10-22,Original,62.41,44.07,40.88,40.88,Paid,
+CLM0000005,ACC0000006,2026-10-24,Original,32.05,20.40,18.97,18.97,Paid,
+CLM0000006,ACC0000008,2026-10-25,Original,56.33,36.90,34.11,0.00,Denied,
+CLM0000007,ACC0000009,2026-10-27,Original,64.12,45.12,41.76,41.76,Paid,
+CLM0000008,ACC0000010,2026-10-29,Original,45.01,29.88,27.50,27.50,Paid,
