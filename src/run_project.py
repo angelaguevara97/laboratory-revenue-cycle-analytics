@@ -1,5 +1,5 @@
-from generate_data import build_dataset, write_outputs
-from analytics_engine import run_analytics
+from .generate_data import build_dataset, write_outputs
+from .analytics_engine import run_analytics
 
 
 def main() -> None:
