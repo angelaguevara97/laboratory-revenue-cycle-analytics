@@ -13,7 +13,21 @@ st.caption("Synthetic educational simulation. No patient data, payer contract da
 
 required = [ANALYTICS / "exception_queue.csv", ANALYTICS / "revenue_metrics.csv", DATA / "claims.csv", DATA / "denials.csv"]
 if not all(path.exists() for path in required):
-    st.error("Project data has not been generated. Run: python src/run_project.py")
+    with st.spinner("Preparing synthetic laboratory revenue cycle data..."):
+        try:
+            from src.generate_data import build_dataset, write_outputs
+            from src.analytics_engine import run_analytics
+
+            tables = build_dataset(25_000)
+            write_outputs(tables)
+            run_analytics()
+        except Exception as exc:
+            st.error("The synthetic project data could not be initialized.")
+            st.exception(exc)
+            st.stop()
+
+if not all(path.exists() for path in required):
+    st.error("The synthetic project data was not created successfully.")
     st.stop()
 
 queue = pd.read_csv(ANALYTICS / "exception_queue.csv")
