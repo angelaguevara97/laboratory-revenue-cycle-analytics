@@ -91,7 +91,7 @@ def readable_bar_chart(data, category, value, *, height=330, value_format=",.0f"
         x=alt.X(
             f"{category}:N",
             sort=order,
-            axis=alt.Axis(title=None, labelAngle=0, labelLimit=320, labelPadding=10),
+            axis=alt.Axis(title=None, labelAngle=0, labelLimit=320, labelPadding=10, labelOverlap=False),
         ),
         y=alt.Y(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
         tooltip=[
@@ -100,7 +100,26 @@ def readable_bar_chart(data, category, value, *, height=330, value_format=",.0f"
         ],
     )
     bars = base.mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-    labels = base.mark_text(dy=-8, fontSize=12).encode(
+    labels = base.mark_text(dy=-8, fontSize=12).encode(text=alt.Text(f"{value}:Q", format=value_format))
+    return (bars + labels).properties(height=height).configure_view(strokeWidth=0)
+
+
+def readable_horizontal_chart(data, category, value, *, height=300, value_format=",.0f"):
+    order = data[category].tolist()
+    base = alt.Chart(data).encode(
+        y=alt.Y(
+            f"{category}:N",
+            sort=order,
+            axis=alt.Axis(title=None, labelLimit=260, labelPadding=8, labelOverlap=False),
+        ),
+        x=alt.X(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
+        tooltip=[
+            alt.Tooltip(f"{category}:N", title=category),
+            alt.Tooltip(f"{value}:Q", title=value, format=value_format),
+        ],
+    )
+    bars = base.mark_bar(cornerRadiusEnd=3)
+    labels = base.mark_text(align="left", baseline="middle", dx=6, fontSize=12).encode(
         text=alt.Text(f"{value}:Q", format=value_format)
     )
     return (bars + labels).properties(height=height).configure_view(strokeWidth=0)
@@ -148,17 +167,9 @@ elif page == "Billing Exception Queue":
 
     f1, f2 = st.columns(2)
     with f1:
-        priorities = st.multiselect(
-            "Priority",
-            sorted(queue["priority"].dropna().unique()),
-            default=sorted(queue["priority"].dropna().unique()),
-        )
+        priorities = st.multiselect("Priority", sorted(queue["priority"].dropna().unique()), default=sorted(queue["priority"].dropna().unique()))
     with f2:
-        statuses = st.multiselect(
-            "Status",
-            sorted(queue["queue_status"].dropna().unique()),
-            default=sorted(queue["queue_status"].dropna().unique()),
-        )
+        statuses = st.multiselect("Status", sorted(queue["queue_status"].dropna().unique()), default=sorted(queue["queue_status"].dropna().unique()))
 
     filtered = queue[queue["priority"].isin(priorities) & queue["queue_status"].isin(statuses)].copy()
     q1, q2, q3 = st.columns(3)
@@ -166,30 +177,16 @@ elif page == "Billing Exception Queue":
     q2.metric("Revenue at risk", f"${filtered['revenue_at_risk'].sum():,.0f}")
     q3.metric("Urgent cases", f"{(filtered['priority'] == 'Urgent').sum():,}")
 
-    preferred = [
-        "accession_id", "payer_name", "service_date", "diagnosis_code", "exception_reason",
-        "diagnosis_action", "days_to_filing", "filing_deadline", "charge_amount",
-        "revenue_at_risk", "priority", "queue_status",
-    ]
+    preferred = ["accession_id", "payer_name", "service_date", "diagnosis_code", "exception_reason", "diagnosis_action", "days_to_filing", "filing_deadline", "charge_amount", "revenue_at_risk", "priority", "queue_status"]
     display_cols = [col for col in preferred if col in filtered.columns]
     st.dataframe(
-        filtered[display_cols],
-        use_container_width=True,
-        hide_index=True,
-        height=520,
+        filtered[display_cols], use_container_width=True, hide_index=True, height=520,
         column_config={
-            "accession_id": "Accession",
-            "payer_name": "Payer",
-            "service_date": "Service date",
-            "diagnosis_code": "Diagnosis",
-            "exception_reason": "Exception",
-            "diagnosis_action": "Recommended action",
-            "days_to_filing": st.column_config.NumberColumn("Days to filing", format="%d"),
-            "filing_deadline": "Filing deadline",
+            "accession_id": "Accession", "payer_name": "Payer", "service_date": "Service date", "diagnosis_code": "Diagnosis",
+            "exception_reason": "Exception", "diagnosis_action": "Recommended action",
+            "days_to_filing": st.column_config.NumberColumn("Days to filing", format="%d"), "filing_deadline": "Filing deadline",
             "charge_amount": st.column_config.NumberColumn("Charge", format="$%.2f"),
-            "revenue_at_risk": st.column_config.NumberColumn("Revenue at risk", format="$%.2f"),
-            "priority": "Priority",
-            "queue_status": "Status",
+            "revenue_at_risk": st.column_config.NumberColumn("Revenue at risk", format="$%.2f"), "priority": "Priority", "queue_status": "Status",
         },
     )
 
@@ -203,48 +200,13 @@ elif page == "Denial Management":
     c3.metric("Recovered dollars", f"${metrics['recovered_dollars']:,.0f}")
     c4.metric("Recovery rate", f"{metrics['recovery_rate']:.1%}")
 
-    denial_by_category = (
-        denials.groupby("denial_category", as_index=False)["denied_amount"]
-        .sum()
-        .sort_values("denied_amount", ascending=False)
-        .rename(columns={"denial_category": "Denial category", "denied_amount": "Denied dollars"})
-    )
+    denial_by_category = denials.groupby("denial_category", as_index=False)["denied_amount"].sum().sort_values("denied_amount", ascending=False).rename(columns={"denial_category": "Denial category", "denied_amount": "Denied dollars"})
     st.markdown("#### Denied Dollars by Category")
-    denial_base = alt.Chart(denial_by_category).encode(
-        y=alt.Y("Denial category:N", sort="-x", axis=alt.Axis(title=None, labelLimit=360)),
-        x=alt.X("Denied dollars:Q", axis=alt.Axis(title="Denied dollars", format="$,.0f")),
-        tooltip=[
-            alt.Tooltip("Denial category:N", title="Denial category"),
-            alt.Tooltip("Denied dollars:Q", title="Denied dollars", format="$,.2f"),
-        ],
-    )
-    denial_bars = denial_base.mark_bar(cornerRadiusEnd=3)
-    denial_labels = denial_base.mark_text(align="left", baseline="middle", dx=6, fontSize=12).encode(
-        text=alt.Text("Denied dollars:Q", format="$,.0f")
-    )
-    denial_chart = (denial_bars + denial_labels).properties(height=320).configure_view(strokeWidth=0)
-    st.altair_chart(denial_chart, use_container_width=True)
+    st.altair_chart(readable_horizontal_chart(denial_by_category, "Denial category", "Denied dollars", height=320, value_format="$,.0f"), use_container_width=True)
 
-    status = (
-        denials.groupby("resolution_status")
-        .agg(
-            Claims=("claim_id", "count"),
-            Denied_dollars=("denied_amount", "sum"),
-            Recovered_dollars=("recovered_amount", "sum"),
-        )
-        .reset_index()
-        .rename(columns={"resolution_status": "Resolution status"})
-    )
+    status = denials.groupby("resolution_status").agg(Claims=("claim_id", "count"), Denied_dollars=("denied_amount", "sum"), Recovered_dollars=("recovered_amount", "sum")).reset_index().rename(columns={"resolution_status": "Resolution status"})
     st.markdown("#### Resolution Outcomes")
-    st.dataframe(
-        status,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Denied_dollars": st.column_config.NumberColumn("Denied dollars", format="$%.2f"),
-            "Recovered_dollars": st.column_config.NumberColumn("Recovered dollars", format="$%.2f"),
-        },
-    )
+    st.dataframe(status, use_container_width=True, hide_index=True, column_config={"Denied_dollars": st.column_config.NumberColumn("Denied dollars", format="$%.2f"), "Recovered_dollars": st.column_config.NumberColumn("Recovered dollars", format="$%.2f")})
 
 else:
     st.subheader("Validation Quality")
@@ -263,17 +225,15 @@ else:
     with left:
         st.markdown("#### Diagnosis Validation")
         diagnosis_chart = diagnosis["diagnosis_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.altair_chart(readable_bar_chart(diagnosis_chart, "Result", "Records", height=330), use_container_width=True)
+        st.altair_chart(readable_horizontal_chart(diagnosis_chart, "Result", "Records", height=300), use_container_width=True)
     with right:
         st.markdown("#### Eligibility Validation")
         eligibility_chart = eligibility["eligibility_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.altair_chart(readable_bar_chart(eligibility_chart, "Result", "Records", height=330), use_container_width=True)
+        st.altair_chart(readable_horizontal_chart(eligibility_chart, "Result", "Records", height=300), use_container_width=True)
 
     st.markdown("#### Duplicate Review")
     duplicate_chart = duplicates["duplicate_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-    st.altair_chart(readable_bar_chart(duplicate_chart, "Result", "Records", height=330), use_container_width=True)
+    st.altair_chart(readable_horizontal_chart(duplicate_chart, "Result", "Records", height=240), use_container_width=True)
 
 st.divider()
-st.caption(
-    "Portfolio simulation: all policies, payer names, financial arrangements, authorization logic, filing limits, and outcomes are synthetic and intended for educational demonstration only."
-)
+st.caption("Portfolio simulation: all policies, payer names, financial arrangements, authorization logic, filing limits, and outcomes are synthetic and intended for educational demonstration only.")
