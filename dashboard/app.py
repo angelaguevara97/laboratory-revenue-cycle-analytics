@@ -87,23 +87,23 @@ duplicates = pd.read_csv(ANALYTICS / "duplicate_review.csv")
 
 def readable_bar_chart(data, category, value, *, height=330, value_format=",.0f"):
     order = data[category].tolist()
-    return (
-        alt.Chart(data)
-        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-        .encode(
-            x=alt.X(
-                f"{category}:N",
-                sort=order,
-                axis=alt.Axis(title=None, labelAngle=0, labelLimit=260, labelPadding=10),
-            ),
-            y=alt.Y(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
-            tooltip=[
-                alt.Tooltip(f"{category}:N", title=category),
-                alt.Tooltip(f"{value}:Q", title=value, format=value_format),
-            ],
-        )
-        .properties(height=height)
+    base = alt.Chart(data).encode(
+        x=alt.X(
+            f"{category}:N",
+            sort=order,
+            axis=alt.Axis(title=None, labelAngle=0, labelLimit=320, labelPadding=10),
+        ),
+        y=alt.Y(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
+        tooltip=[
+            alt.Tooltip(f"{category}:N", title=category),
+            alt.Tooltip(f"{value}:Q", title=value, format=value_format),
+        ],
     )
+    bars = base.mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+    labels = base.mark_text(dy=-8, fontSize=12).encode(
+        text=alt.Text(f"{value}:Q", format=value_format)
+    )
+    return (bars + labels).properties(height=height).configure_view(strokeWidth=0)
 
 
 st.sidebar.markdown("### Revenue Cycle Dashboard")
@@ -210,19 +210,19 @@ elif page == "Denial Management":
         .rename(columns={"denial_category": "Denial category", "denied_amount": "Denied dollars"})
     )
     st.markdown("#### Denied Dollars by Category")
-    denial_chart = (
-        alt.Chart(denial_by_category)
-        .mark_bar(cornerRadiusEnd=3)
-        .encode(
-            y=alt.Y("Denial category:N", sort="-x", axis=alt.Axis(title=None, labelLimit=300)),
-            x=alt.X("Denied dollars:Q", axis=alt.Axis(title="Denied dollars", format="$,.0f")),
-            tooltip=[
-                alt.Tooltip("Denial category:N", title="Denial category"),
-                alt.Tooltip("Denied dollars:Q", title="Denied dollars", format="$,.2f"),
-            ],
-        )
-        .properties(height=320)
+    denial_base = alt.Chart(denial_by_category).encode(
+        y=alt.Y("Denial category:N", sort="-x", axis=alt.Axis(title=None, labelLimit=360)),
+        x=alt.X("Denied dollars:Q", axis=alt.Axis(title="Denied dollars", format="$,.0f")),
+        tooltip=[
+            alt.Tooltip("Denial category:N", title="Denial category"),
+            alt.Tooltip("Denied dollars:Q", title="Denied dollars", format="$,.2f"),
+        ],
     )
+    denial_bars = denial_base.mark_bar(cornerRadiusEnd=3)
+    denial_labels = denial_base.mark_text(align="left", baseline="middle", dx=6, fontSize=12).encode(
+        text=alt.Text("Denied dollars:Q", format="$,.0f")
+    )
+    denial_chart = (denial_bars + denial_labels).properties(height=320).configure_view(strokeWidth=0)
     st.altair_chart(denial_chart, use_container_width=True)
 
     status = (
