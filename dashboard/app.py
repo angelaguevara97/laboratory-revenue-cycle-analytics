@@ -1,239 +1,80 @@
 from pathlib import Path
 import sys
-
-import altair as alt
 import pandas as pd
+import plotly.express as px
 import streamlit as st
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-DATA = ROOT / "data" / "generated"
-ANALYTICS = ROOT / "data" / "analytics"
-
-st.set_page_config(
-    page_title="Laboratory Revenue Cycle Analytics",
-    page_icon="🧪",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-st.markdown(
-    """
-    <style>
-    .block-container {padding-top: 2rem; padding-bottom: 2.5rem; max-width: 1450px;}
-    [data-testid="stSidebar"] {border-right: 1px solid rgba(49, 51, 63, 0.12);}
-    [data-testid="stMetric"] {
-        background: rgba(248, 249, 251, 0.85);
-        border: 1px solid rgba(49, 51, 63, 0.10);
-        padding: 14px 16px;
-        border-radius: 12px;
-    }
-    [data-testid="stMetricLabel"] {font-weight: 600;}
-    div[data-testid="stDataFrame"] {border: 1px solid rgba(49, 51, 63, 0.10); border-radius: 10px; overflow: hidden;}
-    .portfolio-note {
-        padding: 12px 14px;
-        border-radius: 10px;
-        background: rgba(248, 249, 251, 0.8);
-        border: 1px solid rgba(49, 51, 63, 0.10);
-        color: #6b7280;
-        font-size: 0.9rem;
-        margin-bottom: 1.2rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.title("Laboratory Revenue Cycle Analytics")
-st.markdown(
-    '<div class="portfolio-note">Synthetic educational simulation • 25,000 laboratory accessions • No patient data, payer contract data, or proprietary laboratory data is used.</div>',
-    unsafe_allow_html=True,
-)
-
-required = [
-    ANALYTICS / "exception_queue.csv",
-    ANALYTICS / "revenue_metrics.csv",
-    DATA / "claims.csv",
-    DATA / "denials.csv",
-]
-if not all(path.exists() for path in required):
-    with st.spinner("Preparing synthetic laboratory revenue cycle data..."):
-        try:
-            from src.generate_data import build_dataset, write_outputs
-            from src.analytics_engine import run_analytics
-
-            tables = build_dataset(25_000)
-            write_outputs(tables)
-            run_analytics()
-        except Exception as exc:
-            st.error("The synthetic project data could not be initialized.")
-            st.exception(exc)
-            st.stop()
-
-if not all(path.exists() for path in required):
-    st.error("The synthetic project data was not created successfully.")
-    st.stop()
-
-queue = pd.read_csv(ANALYTICS / "exception_queue.csv")
-metrics = pd.read_csv(ANALYTICS / "revenue_metrics.csv").iloc[0]
-claims = pd.read_csv(DATA / "claims.csv")
-denials = pd.read_csv(DATA / "denials.csv")
-diagnosis = pd.read_csv(ANALYTICS / "diagnosis_validation.csv")
-eligibility = pd.read_csv(ANALYTICS / "eligibility_validation.csv")
-duplicates = pd.read_csv(ANALYTICS / "duplicate_review.csv")
-
-
-def readable_bar_chart(data, category, value, *, height=330, value_format=",.0f"):
-    order = data[category].tolist()
-    base = alt.Chart(data).encode(
-        x=alt.X(
-            f"{category}:N",
-            sort=order,
-            axis=alt.Axis(title=None, labelAngle=0, labelLimit=320, labelPadding=10, labelOverlap=False),
-        ),
-        y=alt.Y(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
-        tooltip=[
-            alt.Tooltip(f"{category}:N", title=category),
-            alt.Tooltip(f"{value}:Q", title=value, format=value_format),
-        ],
-    )
-    bars = base.mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-    labels = base.mark_text(dy=-8, fontSize=12).encode(text=alt.Text(f"{value}:Q", format=value_format))
-    return (bars + labels).properties(height=height).configure_view(strokeWidth=0)
-
-
-def readable_horizontal_chart(data, category, value, *, height=300, value_format=",.0f"):
-    order = data[category].tolist()
-    base = alt.Chart(data).encode(
-        y=alt.Y(
-            f"{category}:N",
-            sort=order,
-            axis=alt.Axis(title=None, labelLimit=260, labelPadding=8, labelOverlap=False),
-        ),
-        x=alt.X(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
-        tooltip=[
-            alt.Tooltip(f"{category}:N", title=category),
-            alt.Tooltip(f"{value}:Q", title=value, format=value_format),
-        ],
-    )
-    bars = base.mark_bar(cornerRadiusEnd=3)
-    labels = base.mark_text(align="left", baseline="middle", dx=6, fontSize=12).encode(
-        text=alt.Text(f"{value}:Q", format=value_format)
-    )
-    return (bars + labels).properties(height=height).configure_view(strokeWidth=0)
-
-
-st.sidebar.markdown("### Revenue Cycle Dashboard")
-st.sidebar.caption("Explore operational performance, billing exceptions, denials, and prebill validation.")
-page = st.sidebar.radio(
-    "View",
-    ["Executive Overview", "Billing Exception Queue", "Denial Management", "Validation Quality"],
-)
-st.sidebar.divider()
-st.sidebar.caption("Portfolio simulation • Synthetic data only")
-
-if page == "Executive Overview":
-    st.subheader("Executive Overview")
-    st.caption("High-level revenue cycle performance and current exception exposure.")
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Claims submitted", f"{int(metrics['claims_submitted']):,}")
-    c2.metric("Denial rate", f"{metrics['denial_rate']:.1%}")
-    c3.metric("Revenue recovered", f"${metrics['recovered_dollars']:,.0f}")
-    c4.metric("Recovery rate", f"{metrics['recovery_rate']:.1%}")
-
-    c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Gross charges", f"${metrics['gross_charges']:,.0f}")
-    c6.metric("Expected reimbursement", f"${metrics['expected_reimbursement']:,.0f}")
-    c7.metric("Actual payments", f"${metrics['actual_payments']:,.0f}")
-    c8.metric("Avg. resolution days", f"{metrics['average_resolution_days']:.1f}")
-
-    st.markdown("#### Open Revenue Risk")
-    active = queue[queue["queue_status"].isin(["Open", "Escalated"])]
-    r1, r2, r3 = st.columns(3)
-    r1.metric("Exception revenue at risk", f"${active['revenue_at_risk'].sum():,.0f}")
-    r2.metric("Open / escalated exceptions", f"{len(active):,}")
-    r3.metric("Urgent exceptions", f"{(active['priority'] == 'Urgent').sum():,}")
-
-    priority_counts = queue["priority"].value_counts().rename_axis("Priority").reset_index(name="Exceptions")
-    st.markdown("#### Exception Volume by Priority")
-    st.altair_chart(readable_bar_chart(priority_counts, "Priority", "Exceptions", height=330), use_container_width=True)
-
-elif page == "Billing Exception Queue":
-    st.subheader("Billing Exception Queue")
-    st.caption("Prioritized operational work queue for simulated billing follow-up.")
-
-    f1, f2 = st.columns(2)
-    with f1:
-        priorities = st.multiselect("Priority", sorted(queue["priority"].dropna().unique()), default=sorted(queue["priority"].dropna().unique()))
-    with f2:
-        statuses = st.multiselect("Status", sorted(queue["queue_status"].dropna().unique()), default=sorted(queue["queue_status"].dropna().unique()))
-
-    filtered = queue[queue["priority"].isin(priorities) & queue["queue_status"].isin(statuses)].copy()
-    q1, q2, q3 = st.columns(3)
-    q1.metric("Filtered exceptions", f"{len(filtered):,}")
-    q2.metric("Revenue at risk", f"${filtered['revenue_at_risk'].sum():,.0f}")
-    q3.metric("Urgent cases", f"{(filtered['priority'] == 'Urgent').sum():,}")
-
-    preferred = ["accession_id", "payer_name", "service_date", "diagnosis_code", "exception_reason", "diagnosis_action", "days_to_filing", "filing_deadline", "charge_amount", "revenue_at_risk", "priority", "queue_status"]
-    display_cols = [col for col in preferred if col in filtered.columns]
-    st.dataframe(
-        filtered[display_cols], use_container_width=True, hide_index=True, height=520,
-        column_config={
-            "accession_id": "Accession", "payer_name": "Payer", "service_date": "Service date", "diagnosis_code": "Diagnosis",
-            "exception_reason": "Exception", "diagnosis_action": "Recommended action",
-            "days_to_filing": st.column_config.NumberColumn("Days to filing", format="%d"), "filing_deadline": "Filing deadline",
-            "charge_amount": st.column_config.NumberColumn("Charge", format="$%.2f"),
-            "revenue_at_risk": st.column_config.NumberColumn("Revenue at risk", format="$%.2f"), "priority": "Priority", "queue_status": "Status",
-        },
-    )
-
-elif page == "Denial Management":
-    st.subheader("Denial Management")
-    st.caption("Denial exposure, recovery performance, and resolution outcomes.")
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Denied claims", f"{int(metrics['denied_claims']):,}")
-    c2.metric("Denied dollars", f"${metrics['denied_dollars']:,.0f}")
-    c3.metric("Recovered dollars", f"${metrics['recovered_dollars']:,.0f}")
-    c4.metric("Recovery rate", f"{metrics['recovery_rate']:.1%}")
-
-    denial_by_category = denials.groupby("denial_category", as_index=False)["denied_amount"].sum().sort_values("denied_amount", ascending=False).rename(columns={"denial_category": "Denial category", "denied_amount": "Denied dollars"})
-    st.markdown("#### Denied Dollars by Category")
-    st.altair_chart(readable_horizontal_chart(denial_by_category, "Denial category", "Denied dollars", height=320, value_format="$,.0f"), use_container_width=True)
-
-    status = denials.groupby("resolution_status").agg(Claims=("claim_id", "count"), Denied_dollars=("denied_amount", "sum"), Recovered_dollars=("recovered_amount", "sum")).reset_index().rename(columns={"resolution_status": "Resolution status"})
-    st.markdown("#### Resolution Outcomes")
-    st.dataframe(status, use_container_width=True, hide_index=True, column_config={"Denied_dollars": st.column_config.NumberColumn("Denied dollars", format="$%.2f"), "Recovered_dollars": st.column_config.NumberColumn("Recovered dollars", format="$%.2f")})
-
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
+from src.generate_data import build_dataset,write_outputs
+from src.analytics_engine import run_analytics,load_tables,claim_fact,filter_fact,kpis,grouped_metrics,diagnosis_analytics,recovery_opportunities,build_exception_queue
+DATA=ROOT/'data'/'generated'; ANALYTICS=ROOT/'data'/'analytics'
+st.set_page_config(page_title='Laboratory Revenue Cycle Analytics',page_icon='🧪',layout='wide',initial_sidebar_state='expanded')
+st.markdown("""<style>.block-container{padding-top:1.4rem;max-width:1550px}.stMetric{background:#fff;border:1px solid #dce4df;border-radius:10px;padding:12px}.synthetic{background:#E8F3EC;border-left:5px solid #00843D;padding:10px 14px;border-radius:6px;color:#333}[data-testid='stSidebar']{background:#F5F7F8}</style>""",unsafe_allow_html=True)
+if not (ANALYTICS/'claim_fact.csv').exists():
+    with st.spinner('Preparing synthetic enterprise revenue cycle data'):
+        write_outputs(build_dataset(25_000)); run_analytics()
+t=load_tables(); fact=claim_fact(t); queue=build_exception_queue(t)
+st.title('Laboratory Revenue Cycle Analytics')
+st.markdown('<div class="synthetic"><b>Independent portfolio simulation.</b> All patient, claim, financial, payer performance, denial behavior, filing limits, and recovery outcomes are synthetic. Real payer names are categorical labels only and do not represent actual insurer performance.</div>',unsafe_allow_html=True)
+PAGES=['Executive Overview','Regional & Provider Analytics','Franchise Performance','Diagnosis Code Analytics','Payer Performance & Denial Analytics','Billing Exceptions & Work Queues','Revenue Recovery Opportunities']; page=st.sidebar.radio('Analytics workspace',PAGES); st.sidebar.markdown('### Global Filters')
+def choices(label,col): return st.sidebar.multiselect(label,sorted(fact[col].dropna().astype(str).unique().tolist()))
+regions=choices('Region','region'); calls=choices('Provider call point','call_point'); franchises=choices('Clinical franchise','franchise'); tests=choices('Laboratory test','test_name'); payers=choices('Payer','payer_name'); lob=choices('Line of business','line_of_business'); dx=choices('Diagnosis code','diagnosis_code'); denial=choices('Denial category','denial_category')
+f=filter_fact(fact,{'region':regions,'call_point':calls,'franchise':franchises,'test_name':tests,'payer_name':payers,'line_of_business':lob,'diagnosis_code':dx,'denial_category':denial})
+def money(x): return f'${x:,.0f}'
+def metric_row(m):
+    c=st.columns(4); c[0].metric('Total submitted claims',f"{m['total_claims']:,}"); c[1].metric('Denied claims',f"{m['denied_claims']:,}"); c[2].metric('Denial rate',f"{m['denial_rate']:.1%}"); c[3].metric('Denied dollars',money(m['denied_dollars'])); c=st.columns(4); c[0].metric('Billed dollars',money(m['billed_dollars'])); c[1].metric('Recovered dollars',money(m['recovered_dollars'])); c[2].metric('Recovery rate',f"{m['recovery_rate']:.1%}"); c[3].metric('Open billing exceptions',f"{len(queue[~queue.queue_status.eq('Resolved')]):,}")
+def bar(df,x,y,title):
+    if df.empty: st.info('No records match the current filters.'); return
+    fig=px.bar(df,x=x,y=y,title=title,color_discrete_sequence=['#00843D']); fig.update_layout(height=390,margin=dict(l=10,r=10,t=50,b=10)); st.plotly_chart(fig,use_container_width=True)
+def line(df,x,y,title):
+    if df.empty:return
+    fig=px.line(df,x=x,y=y,markers=True,title=title,color_discrete_sequence=['#00843D']); fig.update_layout(height=360); st.plotly_chart(fig,use_container_width=True)
+def monthly(frame):
+    g=frame.groupby('month').agg(total_claims=('claim_id','nunique'),denied_claims=('is_denied','sum'),denied_dollars=('denied_amount','sum')).reset_index(); g['denial_rate']=g.denied_claims/g.total_claims; return g
+m=kpis(f)
+if page=='Executive Overview':
+    st.header('Laboratory Revenue Cycle | Executive Overview'); metric_row(m); a,b=st.columns(2)
+    with a: line(monthly(f),'month','denial_rate','Monthly denial rate')
+    with b: line(monthly(f),'month','denied_dollars','Monthly denied dollars')
+    a,b=st.columns(2)
+    with a: bar(grouped_metrics(f,'franchise').sort_values('denied_dollars',ascending=False),'franchise','denied_dollars','Denied dollars by clinical franchise')
+    with b: bar(grouped_metrics(f,'region'),'region','denial_rate','Denial rate by region')
+    a,b=st.columns(2)
+    with a: bar(grouped_metrics(f,'payer_name').nlargest(10,'denied_dollars'),'payer_name','denied_dollars','Top payers by denied dollars')
+    with b: bar(grouped_metrics(f,'test_name').nlargest(10,'denied_dollars'),'test_name','denied_dollars','Top tests by denied dollars')
+elif page=='Regional & Provider Analytics':
+    st.header('Regional & Provider Analytics'); metric_row(m); a,b=st.columns(2)
+    with a: bar(grouped_metrics(f,'region'),'region','denial_rate','Denial rate by region')
+    with b: bar(grouped_metrics(f,'call_point').sort_values('denied_dollars',ascending=False),'call_point','denied_dollars','Denied dollars by provider call point')
+    heat=f.groupby(['region','call_point']).agg(claims=('claim_id','nunique'),denials=('is_denied','sum')).reset_index(); heat['denial_rate']=heat.denials/heat.claims; fig=px.density_heatmap(heat,x='call_point',y='region',z='denial_rate',color_continuous_scale=[[0,'#E8F3EC'],[1,'#00843D']],title='Region and call point denial heatmap'); st.plotly_chart(fig,use_container_width=True); line(monthly(f),'month','denial_rate','Monthly denial trend')
+elif page=='Franchise Performance':
+    st.header('Franchise Performance'); metric_row(m); rank=st.selectbox('Rank laboratory tests by',['denied_dollars','denial_rate','denied_claims']); gm=grouped_metrics(f,'test_name').sort_values(rank,ascending=False).head(10); bar(gm,'test_name',rank,f"Top tests by {rank.replace('_',' ')}"); a,b=st.columns(2)
+    with a: bar(grouped_metrics(f,'franchise'),'franchise','denial_rate','Denial rate by franchise')
+    with b: bar(grouped_metrics(f,'payer_name').nlargest(12,'denied_dollars'),'payer_name','denied_dollars','Payer exposure')
+    detail=f.groupby(['franchise','test_name','payer_name','diagnosis_code'],dropna=False).agg(claims=('claim_id','nunique'),denied=('is_denied','sum'),denied_dollars=('denied_amount','sum')).reset_index(); st.dataframe(detail,use_container_width=True,hide_index=True)
+elif page=='Diagnosis Code Analytics':
+    st.header('Diagnosis Code Analytics'); metric_row(m); st.caption('Diagnosis codes on denied claims are not automatically treated as the cause. Diagnosis related metrics use the synthetic denial reason classification.'); dxm=diagnosis_analytics(f)
+    if not dxm.empty:
+        a,b=st.columns(2)
+        with a: bar(dxm.nlargest(20,'denied_claims'),'diagnosis_code','denied_claims','Diagnosis related denials by claim count')
+        with b: bar(dxm.nlargest(20,'denied_dollars'),'diagnosis_code','denied_dollars','Diagnosis related denied dollars')
+        st.dataframe(dxm[['diagnosis_code','diagnosis_description','total_claims','denied_claims','denial_rate','denied_dollars']].sort_values('denied_dollars',ascending=False),use_container_width=True,hide_index=True); st.download_button('Export diagnosis analysis CSV',dxm.to_csv(index=False),'diagnosis_analysis.csv','text/csv')
+elif page=='Payer Performance & Denial Analytics':
+    st.header('Payer Performance & Denial Analytics'); metric_row(m); pg=grouped_metrics(f,'payer_name'); pg['sample_warning']=pg.total_claims.lt(100); a,b=st.columns(2)
+    with a: bar(pg.nlargest(15,'denied_dollars'),'payer_name','denied_dollars','Top payers by denied dollars')
+    with b: bar(pg.sort_values('denial_rate',ascending=False),'payer_name','denial_rate','Denial rate by payer')
+    selected=st.multiselect('Compare payers',sorted(f.payer_name.unique()),default=sorted(f.payer_name.unique())[:2],max_selections=4); st.dataframe(pg[pg.payer_name.isin(selected)],use_container_width=True,hide_index=True); st.caption('Claim counts are displayed with rates to distinguish high denial volume from elevated denial rate. Comparisons with fewer than 100 claims are flagged as small samples.')
+elif page=='Billing Exceptions & Work Queues':
+    st.header('Billing Exceptions & Work Queues'); q=queue.copy()
+    for col,vals in {'region':regions,'call_point':calls,'franchise':franchises,'payer_name':payers,'line_of_business':lob}.items():
+        if vals:q=q[q[col].isin(vals)]
+    openq=q[~q.queue_status.eq('Resolved')]; c=st.columns(4); c[0].metric('Open exceptions',f'{len(openq):,}'); c[1].metric('Financial exposure',money(openq.financial_exposure.sum())); c[2].metric('Average exception age',f'{openq.exception_age_days.mean():.1f} days' if len(openq) else '0 days'); c[3].metric('Awaiting provider response',f"{(openq.queue_status=='Awaiting provider response').sum():,}"); a,b=st.columns(2)
+    with a: bar(openq.groupby('exception_type',as_index=False).size().rename(columns={'size':'exceptions'}),'exception_type','exceptions','Open exceptions by category')
+    with b: bar(openq.groupby('payer_name',as_index=False).financial_exposure.sum().nlargest(12,'financial_exposure'),'payer_name','financial_exposure','Financial exposure by payer')
+    st.dataframe(openq[['accession_id','payer_name','region','call_point','franchise','test_name','exception_type','queue_status','exception_age_days','days_to_filing','financial_exposure','priority_score','diagnosis_action']].sort_values('priority_score',ascending=False),use_container_width=True,hide_index=True,height=520)
 else:
-    st.subheader("Validation Quality")
-    st.caption("Prebill validation signals across diagnosis, eligibility, and duplicate review workflows.")
-
-    diagnosis_exceptions = int((diagnosis["diagnosis_result"] != "Pass").sum())
-    eligibility_exceptions = int((eligibility["eligibility_result"] != "Pass").sum())
-    duplicate_signals = int((duplicates["duplicate_review_status"] == "Manual review").sum())
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Diagnosis exceptions", f"{diagnosis_exceptions:,}")
-    c2.metric("Eligibility exceptions", f"{eligibility_exceptions:,}")
-    c3.metric("Duplicate review signals", f"{duplicate_signals:,}")
-
-    left, right = st.columns(2)
-    with left:
-        st.markdown("#### Diagnosis Validation")
-        diagnosis_chart = diagnosis["diagnosis_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.altair_chart(readable_horizontal_chart(diagnosis_chart, "Result", "Records", height=300), use_container_width=True)
-    with right:
-        st.markdown("#### Eligibility Validation")
-        eligibility_chart = eligibility["eligibility_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.altair_chart(readable_horizontal_chart(eligibility_chart, "Result", "Records", height=300), use_container_width=True)
-
-    st.markdown("#### Duplicate Review")
-    duplicate_chart = duplicates["duplicate_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-    st.altair_chart(readable_horizontal_chart(duplicate_chart, "Result", "Records", height=240), use_container_width=True)
-
-st.divider()
-st.caption("Portfolio simulation: all policies, payer names, financial arrangements, authorization logic, filing limits, and outcomes are synthetic and intended for educational demonstration only.")
+    st.header('Revenue Recovery Opportunities'); r=recovery_opportunities(f); c=st.columns(4); c[0].metric('Total denied dollars',money(r.denied_amount.sum())); c[1].metric('Estimated recoverable',money(r.estimated_recoverable.sum())); c[2].metric('Recovered dollars',money(r.recovered_amount.sum())); c[3].metric('Outstanding denied balance',money(r.outstanding.sum())); a,b=st.columns(2)
+    with a: bar(r.groupby('payer_name',as_index=False).estimated_recoverable.sum().nlargest(12,'estimated_recoverable'),'payer_name','estimated_recoverable','Estimated recoverable dollars by payer')
+    with b: bar(r.groupby('franchise',as_index=False).estimated_recoverable.sum(),'franchise','estimated_recoverable','Estimated recoverable dollars by franchise')
+    ranked=r.groupby(['payer_name','franchise','test_name','denial_category'],as_index=False).agg(denied_claim_count=('claim_id','nunique'),denied_dollars=('denied_amount','sum'),estimated_recoverable=('estimated_recoverable','sum'),priority_score=('priority_score','mean')).sort_values('priority_score',ascending=False); st.dataframe(ranked,use_container_width=True,hide_index=True); st.caption('Projected recoveries are synthetic estimates based on simulated historical outcomes and are shown separately from realized synthetic recoveries.')
+st.divider(); st.caption('Synthetic portfolio demonstration. No PHI, proprietary laboratory data, payer contracts, actual insurer denial statistics, or actual reimbursement policies are used.')
