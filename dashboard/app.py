@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -83,6 +84,28 @@ diagnosis = pd.read_csv(ANALYTICS / "diagnosis_validation.csv")
 eligibility = pd.read_csv(ANALYTICS / "eligibility_validation.csv")
 duplicates = pd.read_csv(ANALYTICS / "duplicate_review.csv")
 
+
+def readable_bar_chart(data, category, value, *, height=330, value_format=",.0f"):
+    order = data[category].tolist()
+    return (
+        alt.Chart(data)
+        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X(
+                f"{category}:N",
+                sort=order,
+                axis=alt.Axis(title=None, labelAngle=0, labelLimit=260, labelPadding=10),
+            ),
+            y=alt.Y(f"{value}:Q", axis=alt.Axis(title=value, format=value_format)),
+            tooltip=[
+                alt.Tooltip(f"{category}:N", title=category),
+                alt.Tooltip(f"{value}:Q", title=value, format=value_format),
+            ],
+        )
+        .properties(height=height)
+    )
+
+
 st.sidebar.markdown("### Revenue Cycle Dashboard")
 st.sidebar.caption("Explore operational performance, billing exceptions, denials, and prebill validation.")
 page = st.sidebar.radio(
@@ -117,7 +140,7 @@ if page == "Executive Overview":
 
     priority_counts = queue["priority"].value_counts().rename_axis("Priority").reset_index(name="Exceptions")
     st.markdown("#### Exception Volume by Priority")
-    st.bar_chart(priority_counts, x="Priority", y="Exceptions", height=330)
+    st.altair_chart(readable_bar_chart(priority_counts, "Priority", "Exceptions", height=330), use_container_width=True)
 
 elif page == "Billing Exception Queue":
     st.subheader("Billing Exception Queue")
@@ -187,7 +210,20 @@ elif page == "Denial Management":
         .rename(columns={"denial_category": "Denial category", "denied_amount": "Denied dollars"})
     )
     st.markdown("#### Denied Dollars by Category")
-    st.bar_chart(denial_by_category, x="Denial category", y="Denied dollars", height=360)
+    denial_chart = (
+        alt.Chart(denial_by_category)
+        .mark_bar(cornerRadiusEnd=3)
+        .encode(
+            y=alt.Y("Denial category:N", sort="-x", axis=alt.Axis(title=None, labelLimit=300)),
+            x=alt.X("Denied dollars:Q", axis=alt.Axis(title="Denied dollars", format="$,.0f")),
+            tooltip=[
+                alt.Tooltip("Denial category:N", title="Denial category"),
+                alt.Tooltip("Denied dollars:Q", title="Denied dollars", format="$,.2f"),
+            ],
+        )
+        .properties(height=320)
+    )
+    st.altair_chart(denial_chart, use_container_width=True)
 
     status = (
         denials.groupby("resolution_status")
@@ -227,15 +263,15 @@ else:
     with left:
         st.markdown("#### Diagnosis Validation")
         diagnosis_chart = diagnosis["diagnosis_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.bar_chart(diagnosis_chart, x="Result", y="Records", height=330)
+        st.altair_chart(readable_bar_chart(diagnosis_chart, "Result", "Records", height=330), use_container_width=True)
     with right:
         st.markdown("#### Eligibility Validation")
         eligibility_chart = eligibility["eligibility_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-        st.bar_chart(eligibility_chart, x="Result", y="Records", height=330)
+        st.altair_chart(readable_bar_chart(eligibility_chart, "Result", "Records", height=330), use_container_width=True)
 
     st.markdown("#### Duplicate Review")
     duplicate_chart = duplicates["duplicate_result"].value_counts().rename_axis("Result").reset_index(name="Records")
-    st.bar_chart(duplicate_chart, x="Result", y="Records", height=330)
+    st.altair_chart(readable_bar_chart(duplicate_chart, "Result", "Records", height=330), use_container_width=True)
 
 st.divider()
 st.caption(
