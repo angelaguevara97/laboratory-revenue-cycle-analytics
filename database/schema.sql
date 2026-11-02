@@ -1,101 +1,17 @@
 PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS patients (
-    patient_id TEXT PRIMARY KEY,
-    birth_year INTEGER NOT NULL,
-    sex TEXT NOT NULL,
-    state TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS providers (
-    provider_id TEXT PRIMARY KEY,
-    specialty TEXT NOT NULL,
-    state TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS payers (
-    payer_id TEXT PRIMARY KEY,
-    payer_name TEXT NOT NULL,
-    payer_type TEXT NOT NULL,
-    filing_limit_days INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS accessions (
-    accession_id TEXT PRIMARY KEY,
-    patient_id TEXT NOT NULL,
-    provider_id TEXT NOT NULL,
-    payer_id TEXT NOT NULL,
-    service_date TEXT NOT NULL,
-    collection_date TEXT NOT NULL,
-    test_code TEXT NOT NULL,
-    diagnosis_code TEXT,
-    charge_amount REAL NOT NULL,
-    accession_status TEXT NOT NULL,
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
-    FOREIGN KEY (provider_id) REFERENCES providers(provider_id),
-    FOREIGN KEY (payer_id) REFERENCES payers(payer_id)
-);
-
-CREATE TABLE IF NOT EXISTS eligibility (
-    eligibility_id TEXT PRIMARY KEY,
-    accession_id TEXT NOT NULL,
-    coverage_status TEXT NOT NULL,
-    subscriber_match TEXT NOT NULL,
-    authorization_status TEXT NOT NULL,
-    checked_date TEXT NOT NULL,
-    FOREIGN KEY (accession_id) REFERENCES accessions(accession_id)
-);
-
-CREATE TABLE IF NOT EXISTS claims (
-    claim_id TEXT PRIMARY KEY,
-    accession_id TEXT NOT NULL,
-    submission_date TEXT,
-    claim_type TEXT NOT NULL,
-    charge_amount REAL NOT NULL,
-    allowed_amount REAL NOT NULL,
-    expected_reimbursement REAL NOT NULL,
-    payment_amount REAL NOT NULL,
-    claim_status TEXT NOT NULL,
-    original_claim_id TEXT,
-    FOREIGN KEY (accession_id) REFERENCES accessions(accession_id),
-    FOREIGN KEY (original_claim_id) REFERENCES claims(claim_id)
-);
-
-CREATE TABLE IF NOT EXISTS denials (
-    denial_id TEXT PRIMARY KEY,
-    claim_id TEXT NOT NULL,
-    denial_category TEXT NOT NULL,
-    simulated_reason_code TEXT NOT NULL,
-    denial_date TEXT NOT NULL,
-    denied_amount REAL NOT NULL,
-    resolution_status TEXT NOT NULL,
-    resolution_date TEXT,
-    recovered_amount REAL NOT NULL,
-    FOREIGN KEY (claim_id) REFERENCES claims(claim_id)
-);
-
-CREATE TABLE IF NOT EXISTS work_queue (
-    work_item_id TEXT PRIMARY KEY,
-    accession_id TEXT NOT NULL,
-    exception_type TEXT NOT NULL,
-    priority_score REAL NOT NULL,
-    queue_status TEXT NOT NULL,
-    created_date TEXT NOT NULL,
-    follow_up_date TEXT,
-    resolution_probability REAL NOT NULL,
-    FOREIGN KEY (accession_id) REFERENCES accessions(accession_id)
-);
-
-CREATE TABLE IF NOT EXISTS claim_history (
-    event_id TEXT PRIMARY KEY,
-    claim_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    event_date TEXT NOT NULL,
-    notes TEXT NOT NULL,
-    FOREIGN KEY (claim_id) REFERENCES claims(claim_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_accessions_patient_service ON accessions(patient_id, service_date, test_code);
-CREATE INDEX IF NOT EXISTS idx_claims_accession ON claims(accession_id);
-CREATE INDEX IF NOT EXISTS idx_denials_claim ON denials(claim_id);
-CREATE INDEX IF NOT EXISTS idx_queue_status ON work_queue(queue_status, priority_score);
+CREATE TABLE patients (patient_id TEXT PRIMARY KEY,birth_year INTEGER NOT NULL,sex TEXT NOT NULL);
+CREATE TABLE providers (provider_id TEXT PRIMARY KEY,region TEXT NOT NULL,call_point TEXT NOT NULL);
+CREATE TABLE clients (client_account_id TEXT PRIMARY KEY,region TEXT NOT NULL,call_point TEXT NOT NULL);
+CREATE TABLE payers (payer_id TEXT PRIMARY KEY,payer_name TEXT NOT NULL,parent_organization TEXT NOT NULL,operating_plan TEXT NOT NULL,line_of_business TEXT NOT NULL,filing_limit_days INTEGER NOT NULL,denial_factor REAL NOT NULL);
+CREATE TABLE tests (test_code TEXT PRIMARY KEY,test_name TEXT NOT NULL,franchise TEXT NOT NULL,base_charge REAL NOT NULL);
+CREATE TABLE diagnoses (diagnosis_code TEXT PRIMARY KEY,diagnosis_description TEXT NOT NULL);
+CREATE TABLE accessions (accession_id TEXT PRIMARY KEY,patient_id TEXT NOT NULL,client_account_id TEXT NOT NULL,provider_id TEXT NOT NULL,payer_id TEXT NOT NULL,service_date TEXT NOT NULL,collection_date TEXT NOT NULL,test_code TEXT NOT NULL,diagnosis_code TEXT,charge_amount REAL NOT NULL,region TEXT NOT NULL,call_point TEXT NOT NULL,accession_status TEXT NOT NULL);
+CREATE TABLE eligibility (eligibility_id TEXT PRIMARY KEY,accession_id TEXT NOT NULL,coverage_status TEXT NOT NULL,subscriber_match TEXT NOT NULL,authorization_status TEXT NOT NULL,checked_date TEXT NOT NULL);
+CREATE TABLE claims (claim_id TEXT PRIMARY KEY,accession_id TEXT NOT NULL,submission_date TEXT,claim_type TEXT NOT NULL,charge_amount REAL NOT NULL,allowed_amount REAL NOT NULL,expected_reimbursement REAL NOT NULL,payment_amount REAL NOT NULL,claim_status TEXT NOT NULL,original_claim_id TEXT);
+CREATE TABLE denials (denial_id TEXT PRIMARY KEY,claim_id TEXT NOT NULL,denial_category TEXT NOT NULL,simulated_reason_code TEXT NOT NULL,diagnosis_related INTEGER NOT NULL,denial_date TEXT NOT NULL,denied_amount REAL NOT NULL,resolution_status TEXT NOT NULL,resolution_date TEXT,recovered_amount REAL NOT NULL);
+CREATE TABLE work_queue (work_item_id TEXT PRIMARY KEY,accession_id TEXT NOT NULL,exception_type TEXT NOT NULL,priority_score REAL NOT NULL,queue_status TEXT NOT NULL,created_date TEXT NOT NULL,follow_up_date TEXT,resolution_probability REAL NOT NULL,exception_age_days INTEGER NOT NULL,days_to_filing INTEGER NOT NULL,financial_exposure REAL NOT NULL);
+CREATE TABLE claim_history (event_id TEXT PRIMARY KEY,claim_id TEXT NOT NULL,event_type TEXT NOT NULL,event_date TEXT NOT NULL,notes TEXT NOT NULL);
+CREATE INDEX idx_accessions_dimensions ON accessions(region,call_point,test_code,payer_id);
+CREATE INDEX idx_claims_accession ON claims(accession_id);
+CREATE INDEX idx_denials_claim ON denials(claim_id);
+CREATE INDEX idx_queue_status ON work_queue(queue_status,priority_score);
