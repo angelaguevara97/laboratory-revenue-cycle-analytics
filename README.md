@@ -1,84 +1,112 @@
 # Laboratory Revenue Cycle Analytics
 
-A portfolio simulation of laboratory revenue cycle operations using synthetic data, Python, pandas, SQLite, and Streamlit.
+An enterprise style healthcare revenue cycle portfolio platform built with Python, pandas, SQLite, Streamlit, Plotly, pytest, and GitHub Actions.
 
 ## Live Project
 
 **[Open the Live Interactive Dashboard](https://angel-guevara-revenue-cycles.streamlit.app/)**
 
-The live dashboard lets reviewers explore the finished project without downloading code or running Python locally.
+The application models 25,000 synthetic laboratory accessions and follows billing activity through validation, claim submission, denial analysis, operational follow up, and revenue recovery.
 
-## Project Summary
+> **Independent portfolio simulation.** This project is not affiliated with Quest Diagnostics, any insurer, or any healthcare organization. All patient identifiers, claims, financial amounts, payer behavior, denial rates, filing limits, recovery outcomes, and operational results are synthetic. Real payer names are used only as recognizable categorical labels and do not represent actual payer performance or policy.
 
-This project models how a clinical laboratory can identify billing exceptions before claim submission, organize provider follow up, detect possible duplicate billing, prioritize timely filing risk, analyze denials, and measure revenue recovery.
+## Business Problem
 
-The application generates 25,000 synthetic laboratory accessions and follows related activity through eligibility validation, claim submission, adjudication, denial review, and recovery analytics.
+Laboratory revenue cycle teams need to understand not only how many claims are denied, but where financial exposure is concentrated, which operational exceptions require attention, whether elevated denial volume is driven by claim volume or denial rate, and which recovery opportunities deserve priority.
 
-This is an educational simulation. It does not reproduce the systems, data, policies, workflows, performance, payer contracts, or internal practices of Quest Diagnostics or any other laboratory.
+This project demonstrates those workflows in a reproducible synthetic environment.
 
-## What the System Does
+## Analytics Workspace
 
-1. Generates a reproducible synthetic laboratory billing population.
-2. Validates missing and malformed diagnosis information.
-3. Applies clearly labeled simulated medical necessity review rules.
-4. Identifies eligibility, subscriber, and authorization exceptions.
-5. Detects exact and near duplicate signals for manual review.
-6. Calculates simulated timely filing deadlines.
-7. Prioritizes billing exceptions using urgency, financial exposure, and resolvability.
-8. Produces compliant provider clarification messages that request accurate documentation.
-9. Tracks claim denials, resolution outcomes, and recovered revenue.
-10. Separates gross charges, allowed amounts, expected reimbursement, actual payments, denied dollars, and recovered dollars.
-11. Presents operational and financial metrics in an interactive Streamlit dashboard.
+The Streamlit application contains seven principal pages.
 
-## Dashboard Views
+1. **Executive Overview** with claim volume, denial rate, billed dollars, denied dollars, recovered dollars, recovery rate, monthly trends, franchise exposure, payer exposure, and test level exposure.
+2. **Regional & Provider Analytics** with region and provider call point comparisons, heatmaps, and monthly trends.
+3. **Franchise Performance** with clinical franchise and laboratory test ranking by denial frequency, denial rate, and denied dollars.
+4. **Diagnosis Code Analytics** with ICD 10 CM analysis focused specifically on simulated diagnosis related denials. A diagnosis code appearing on a denied claim is not automatically treated as the cause.
+5. **Payer Performance & Denial Analytics** with claim counts, normalized denial rates, denied dollars, payer comparisons, and small sample warnings.
+6. **Billing Exceptions & Work Queues** with operational status, exception aging, filing urgency, financial exposure, and priority scoring.
+7. **Revenue Recovery Opportunities** with denied balances, projected recoverability, realized synthetic recoveries, and transparent opportunity scoring.
 
-- **Executive Overview:** claim volume, denial rate, recovery, reimbursement, payments, and open revenue risk.
-- **Billing Exception Queue:** filters for priority and status with operational follow up details.
-- **Denial Management:** denied dollars, recovery, denial categories, and resolution outcomes.
-- **Validation Quality:** diagnosis exceptions, eligibility exceptions, and duplicate review signals.
+## Analytical Drilldown
 
-## Revenue Cycle Flow
+The model supports analysis across the following dimensions.
 
-Provider order → specimen collection → accession → prebill validation → claim submission → payer adjudication → payment or denial → follow up → correction or appeal → recovery
+**Region → Provider Call Point → Clinical Franchise → Laboratory Test → Payer → Diagnosis Code**
+
+Global filters keep KPI cards, charts, and tables synchronized across the selected population.
+
+## Synthetic Data Model
+
+The generator uses a fixed random seed for reproducibility and creates related tables for patients, client accounts, providers, payers, laboratory tests, diagnoses, accessions, eligibility, claims, denials, work queues, and claim history.
+
+Client accounts retain consistent region and provider call point assignments. Claims are modeled separately from accessions to reduce double counting risk. Laboratory tests are mapped to clinical franchises and clinically plausible diagnosis examples. Payers include parent organization, operating plan, line of business, and synthetic filing parameters.
+
+The modeled lines of business include Commercial, Medicare Advantage, Medicaid Managed Care, Traditional Medicare, and Traditional Medicaid.
+
+## Revenue Cycle Controls
+
+The analytics layer includes controls for missing or malformed diagnosis information, simulated documentation review, eligibility issues, subscriber mismatches, authorization exceptions, duplicate review, filing urgency, financial exposure, and recovery prioritization.
+
+The project never recommends adding an unsupported diagnosis code to obtain reimbursement. Missing diagnosis information routes to provider clarification. Malformed values route to coding or data correction. Simulated medical necessity or documentation scenarios route to documentation review.
+
+## Metric Definitions
+
+**Denial rate** is denied claims divided by submitted claims in the selected population.
+
+**Denied dollars** are the synthetic expected reimbursement associated with denied claims.
+
+**Recovery rate** is recovered synthetic dollars divided by eligible denied dollars.
+
+**Estimated recoverable dollars** are projected values based on synthetic historical recovery behavior. They are displayed separately from realized synthetic recoveries.
+
+## Data Quality and Testing
+
+Automated tests validate reproducibility, unique identifiers, sensible financial relationships, recovery amounts that do not exceed denied balances, consistent client geography, claim count reconciliation, and prevention of claim double counting.
+
+GitHub Actions runs the pytest suite on repository changes.
+
+## Technology Stack
+
+- Python
+- pandas
+- NumPy
+- SQLite
+- Streamlit
+- Plotly
+- pytest
+- GitHub Actions
 
 ## Project Structure
 
-- `src/generate_data.py` creates the synthetic population and SQLite database.
-- `src/analytics_engine.py` performs validation, duplicate detection, timely filing calculations, queue prioritization, and revenue recovery metrics.
-- `src/run_project.py` runs the complete workflow.
-- `dashboard/app.py` provides the Streamlit application.
-- `database/schema.sql` defines the relational SQLite structure.
-- `tests` contains automated tests for data generation and analytics logic.
-- `docs` contains methodology, the data dictionary, case study, interview guide, and presentation.
-- `data/sample_accessions.csv`, `data/sample_claims.csv`, and `data/sample_denials.csv` provide small reviewable examples.
+```text
+dashboard/app.py              Streamlit and Plotly analytics application
+src/generate_data.py          Reproducible synthetic data generator
+src/analytics_engine.py       Validation, KPI, filtering, and opportunity logic
+database/schema.sql           Relational SQLite schema
+tests/                        Automated data and analytics tests
+docs/                         Case study and methodology documentation
+data/                         Synthetic sample and generated data outputs
+```
 
 ## Run Locally
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python src/run_project.py
+python -m pip install -r requirements.txt
+python src/generate_data.py
+python src/analytics_engine.py
 streamlit run dashboard/app.py
 ```
 
-## Analytical Controls
+The dashboard can also initialize the synthetic dataset automatically when generated analytics files are not present.
 
-Missing diagnosis information is routed for provider clarification rather than invented. Malformed diagnosis information is routed for coding or data correction. Simulated policy-review cases are routed for documentation review. Duplicate matches create manual review signals rather than automatic rejection because legitimate repeat testing and corrected claims can occur.
+## Portfolio Skills Demonstrated
 
-Fictional payers use clearly labeled simulated filing limits. Priority scoring combines filing urgency, financial exposure, and estimated resolvability.
-
-## Metrics
-
-The project calculates claim denial rate, denied dollars, revenue recovered, recovery rate, average resolution time, gross charges, allowed amounts, expected reimbursement, and actual payments.
+Healthcare revenue cycle analytics, laboratory billing, claim denial management, ICD 10 CM analysis, payer analytics, Python, pandas, SQL, SQLite, Streamlit, Plotly, data modeling, financial opportunity analysis, operational workflow analytics, data validation, automated testing, and dashboard development.
 
 ## Data and Privacy
 
-All records are synthetic. The project contains no protected health information. Patient identifiers, providers, payers, financial arrangements, filing limits, authorization logic, and outcomes are generated for educational purposes.
-
-## Limitations
-
-This application is not production billing software. Real deployment would require validated code sets, payer-specific policies, contractual reimbursement logic, security controls, audit logging, privacy safeguards, regulatory review, and integration with laboratory and billing systems.
+No protected health information, real patient records, proprietary laboratory data, payer contracts, actual insurer denial statistics, or actual reimbursement policies are included. The project is designed strictly as an educational and portfolio demonstration.
 
 ## Author
 
